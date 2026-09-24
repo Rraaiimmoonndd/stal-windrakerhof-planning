@@ -1,0 +1,409 @@
+import { firebaseConfig } from "./firebase-config.js";
+
+const DAYS = ["Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Zondag"];
+const SLOTS = ["buiten1", "buiten2", "binnen1", "binnen2"];
+const LAT = 50.9542, LON = 5.8736; // Puth, Limburg (gecontroleerd via Open-Meteo geocoding)
+const FIREBASE_VERSION = "12.19.0";
+const SAVE_DELAY = 500;
+
+const statusEl = document.getElementById("status");
+const notesArea = document.getElementById("notesArea");
+const app = document.getElementById("app");
+
+function setStatus(msg, isError = false) {
+  statusEl.textContent = msg;
+  statusEl.classList.toggle("error", isError);
+}
+
+/* ── Datums ─────────────────────────────────────────────────────────────── */
+
+function getMonday(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function fmtISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function weekDocId(monday) { return `week-${fmtISO(monday)}`; }
+function fmtDayDate(d) { return d.toLocaleDateString("nl-NL", { day: "numeric", month: "numeric" }); }
+function fmtRange(monday) {
+  const sunday = addDays(monday, 6);
+  const sameMonth = monday.getMonth() === sunday.getMonth();
+  const start = monday.toLocaleDateString("nl-NL", sameMonth ? { day: "numeric" } : { day: "numeric", month: "long" });
+  return `${start} – ${sunday.toLocaleDateString("nl-NL", { day: "numeric", month: "long" })}`;
+}
+
+/* ── Opslag: Firestore (gedeeld) of localStorage (demo, alleen dit apparaat) ── */
+
+function isConfigured(cfg) {
+  return !!(cfg && cfg.projectId);
+}
+
+async function createFirestoreStore(cfg) {
+  const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
+  const { initializeApp } = await import(`${base}/firebase-app.js`);
+  const fs = await import(`${base}/firebase-firestore.js`);
+  const fbApp = initializeApp(cfg);
+  let db;
+  try {
+    // Offline-cache: de pagina laadt ook bij slecht bereik in de stal, wijzigingen gaan later mee.
+    db = fs.initializeFirestore(fbApp, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
+  } catch (e) {
+    db = fs.getFirestore(fbApp);
+  }
+  return {
+    shared: true,
+    watch(id, cb, onError) {
+      return fs.onSnapshot(fs.doc(db, "planning", id), snap => cb(snap.exists() ? snap.data() : {}), onError);
+    },
+    merge(id, patch) {
+      return fs.setDoc(fs.doc(db, "planning", id), patch, { merge: true });
+    }
+  };
+}
+
+function createLocalStore() {
+  const PREFIX = "windrakerhof:";
+  const listeners = {};
+  const read = id => { try { return JSON.parse(localStorage.getItem(PREFIX + id)) || {}; } catch (e) { return {}; } };
+  const deepMerge = (a, b) => {
+    const out = { ...a };
+    for (const [k, v] of Object.entries(b)) {
+      out[k] = v && typeof v === "object" && !Array.isArray(v) ? deepMerge(a[k] || {}, v) : v;
+    }
+    return out;
+  };
+  const emit = id => (listeners[id] || []).forEach(cb => cb(read(id)));
+  window.addEventListener("storage", e => { if (e.key && e.key.startsWith(PREFIX)) emit(e.key.slice(PREFIX.length)); });
+  return {
+    shared: false,
+    watch(id, cb) {
+      (listeners[id] = listeners[id] || []).push(cb);
+      cb(read(id));
+      return () => { listeners[id] = listeners[id].filter(x => x !== cb); };
+    },
+    async merge(id, patch) {
+      try { localStorage.setItem(PREFIX + id, JSON.stringify(deepMerge(read(id), patch))); } catch (e) { throw e; }
+      emit(id);
+    }
+  };
+}
+
+/* ── Weer (Open-Meteo, geen sleutel nodig) ────────────────────────────── */
+
+let weatherByDate = {};
+
+function weatherCategory(code) {
+  if ([0, 1].includes(code)) return { icon: "☀️", label: "Zon" };
+  if ([2, 3, 45, 48].includes(code)) return { icon: "⛅", label: "Bewolkt" };
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return { icon: "❄️", label: "Sneeuw" };
+  if ([95, 96, 99].includes(code)) return { icon: "⛈️", label: "Onweer" };
+  return { icon: "🌧️", label: "Bui" }; // regen, motregen, buien
+}
+
+async function loadWeather() {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
+      `&daily=weather_code,temperature_2m_mean,temperature_2m_max,temperature_2m_min` +
+      `&timezone=Europe%2FAmsterdam&past_days=7&forecast_days=16`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const d = (await res.json()).daily;
+    if (!d) return;
+    const next = {};
+    d.time.forEach((iso, i) => {
+      const mean = d.temperature_2m_mean[i] ?? (d.temperature_2m_max[i] + d.temperature_2m_min[i]) / 2;
+      if (d.weather_code[i] == null || mean == null || Number.isNaN(mean)) return;
+      next[iso] = { code: d.weather_code[i], avg: Math.round(mean) };
+    });
+    weatherByDate = next;
+    updateWeather();
+  } catch (e) {
+    // Geen weerbericht beschikbaar: het schema werkt gewoon door.
+  }
+}
+
+function updateWeather() {
+  document.querySelectorAll(".weather[data-date]").forEach(el => {
+    const w = weatherByDate[el.dataset.date];
+    el.replaceChildren();
+    if (!w) { el.textContent = "–"; el.title = "Nog geen weerbericht voor deze dag"; return; }
+    const cat = weatherCategory(w.code);
+    const icon = document.createElement("span");
+    icon.className = "icon";
+    icon.textContent = cat.icon;
+    icon.setAttribute("aria-hidden", "true");
+    el.append(icon, `${cat.label}, ${w.avg}°C`);
+    el.title = `${cat.label}, gemiddeld ${w.avg}°C`;
+  });
+}
+
+/* ── Staat ────────────────────────────────────────────────────────────── */
+
+let store;
+let weeks = [];          // [{title, css, monday, id}]
+let weekData = {};       // id -> {Maandag: {buiten1: "..."}}
+let vastData = {};       // {Maandag: {buiten1: {naam, vast}}}
+let fields = [];         // {weekId, day, slot, input, toggle, cb, pending}
+let unsubscribers = [];
+let renderedMonday = null;
+let savingCount = 0;
+
+function vastOf(day, slot) {
+  const v = vastData[day] && vastData[day][slot];
+  return { naam: (v && typeof v.naam === "string") ? v.naam : "", vast: !!(v && v.vast) };
+}
+function stored(weekId, day, slot) {
+  const w = weekData[weekId];
+  return (w && w[day] && typeof w[day][slot] === "string") ? w[day][slot] : "";
+}
+// Een vaste naam gaat altijd voor (zoals in het prototype); anders geldt wat er voor die week is ingevuld.
+function displayed(weekId, day, slot) {
+  const v = vastOf(day, slot);
+  return v.vast ? v.naam : stored(weekId, day, slot);
+}
+
+async function save(docId, patch) {
+  savingCount++;
+  setStatus(navigator.onLine ? "Opslaan…" : "Offline — wordt opgeslagen zodra je weer verbinding hebt");
+  try {
+    await store.merge(docId, patch);
+    savingCount--;
+    if (savingCount === 0) setStatus(store.shared ? "Opgeslagen ✓ (zichtbaar voor iedereen)" : "Opgeslagen op dit apparaat ✓");
+  } catch (e) {
+    savingCount--;
+    console.error(e);
+    setStatus("Opslaan mislukt — controleer je internetverbinding en probeer opnieuw", true);
+  }
+}
+
+const timers = {};
+function debounce(key, fn) {
+  clearTimeout(timers[key]);
+  timers[key] = setTimeout(() => { delete timers[key]; fn(); }, SAVE_DELAY);
+}
+
+/* ── Weergave ─────────────────────────────────────────────────────────── */
+
+function buildWeeks() {
+  const monday = getMonday(new Date());
+  renderedMonday = fmtISO(monday);
+  const next = addDays(monday, 7);
+  weeks = [
+    { title: "Deze week (actueel)", css: "current", monday, id: weekDocId(monday) },
+    { title: "Volgende week", css: "next", monday: next, id: weekDocId(next) }
+  ];
+  fields = [];
+  app.replaceChildren(...weeks.map(renderBlock));
+  refreshAll();
+  updateWeather();
+}
+
+function renderBlock(week) {
+  const block = document.createElement("section");
+  block.className = "schema-block";
+  block.dataset.week = week.id;
+
+  const header = document.createElement("div");
+  header.className = `schema-header ${week.css}`;
+  const label = document.createElement("h2");
+  label.className = "label";
+  label.style.margin = "0";
+  label.textContent = week.title;
+  const range = document.createElement("span");
+  range.className = "range";
+  range.textContent = fmtRange(week.monday);
+  const summary = document.createElement("span");
+  summary.className = "summary";
+  header.append(label, range, summary);
+  block.appendChild(header);
+
+  const todayISO = fmtISO(new Date());
+  DAYS.forEach((day, idx) => {
+    const date = addDays(week.monday, idx);
+    const row = document.createElement("div");
+    row.className = "day-row";
+    row.dataset.day = day;
+    if (fmtISO(date) === todayISO) row.classList.add("today");
+
+    const top = document.createElement("div");
+    top.className = "day-top";
+    const title = document.createElement("div");
+    title.className = "day-title";
+    const dayName = document.createElement("span");
+    dayName.className = "day-name";
+    dayName.textContent = `${day} ${fmtDayDate(date)}`;
+    title.appendChild(dayName);
+    if (row.classList.contains("today")) {
+      const tag = document.createElement("span");
+      tag.className = "today-tag";
+      tag.textContent = "vandaag";
+      title.appendChild(tag);
+    }
+    const badge = document.createElement("span");
+    badge.className = "day-badge";
+    title.appendChild(badge);
+    const weather = document.createElement("div");
+    weather.className = "weather";
+    weather.dataset.date = fmtISO(date);
+    weather.textContent = "–";
+    top.append(title, weather);
+    row.appendChild(top);
+
+    ["buiten", "binnen"].forEach(group => {
+      const groupRow = document.createElement("div");
+      groupRow.className = "group-row";
+      const gl = document.createElement("div");
+      gl.className = "group-label";
+      gl.textContent = group === "buiten" ? "Buiten" : "Binnen";
+      const persons = document.createElement("div");
+      persons.className = "persons";
+      [1, 2].forEach(n => persons.appendChild(renderField(week, day, `${group}${n}`, `${gl.textContent} zetten, ${day} ${fmtDayDate(date)}, persoon ${n}`)));
+      groupRow.append(gl, persons);
+      row.appendChild(groupRow);
+    });
+    block.appendChild(row);
+  });
+  return block;
+}
+
+function renderField(week, day, slot, aria) {
+  const personRow = document.createElement("div");
+  personRow.className = "person-row";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "naam";
+  input.maxLength = 40;
+  input.autocomplete = "off";
+  input.setAttribute("aria-label", aria);
+
+  const toggle = document.createElement("label");
+  toggle.className = "vast-toggle";
+  toggle.title = "Elke week automatisch terug laten komen";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  toggle.append(cb, "vast");
+  personRow.append(input, toggle);
+
+  const field = { weekId: week.id, day, slot, input, toggle, cb };
+  fields.push(field);
+  const key = `${week.id}|${day}|${slot}`;
+
+  input.addEventListener("input", () => {
+    field.pending = true;
+    updateEmptyState();
+    const value = input.value.trim() ? input.value : "";
+    debounce(key, () => {
+      field.pending = false;
+      const writes = [save(week.id, { [day]: { [slot]: value } })];
+      if (vastOf(day, slot).vast) writes.push(save("vast", { [day]: { [slot]: { naam: value, vast: true } } }));
+      return Promise.all(writes);
+    });
+  });
+  input.addEventListener("blur", () => { if (!timers[key]) { field.pending = false; refreshAll(); } });
+
+  cb.addEventListener("change", () => {
+    // Eerst alles uitrekenen: elke opslag kan meteen een verversing van het scherm veroorzaken.
+    const checked = cb.checked;
+    const naam = input.value.trim() ? input.value : "";
+    // Zet de naam ook in beide zichtbare weken, zodat hij daar blijft staan (ook na uitvinken).
+    const perWeek = weeks.map(w => [w.id, checked ? naam : displayed(w.id, day, slot)]);
+    vastData = { ...vastData, [day]: { ...(vastData[day] || {}), [slot]: { naam, vast: checked } } };
+    save("vast", { [day]: { [slot]: { naam, vast: checked } } });
+    perWeek.forEach(([id, value]) => save(id, { [day]: { [slot]: value } }));
+    refreshAll();
+  });
+
+  return personRow;
+}
+
+function refreshAll() {
+  fields.forEach(f => {
+    const v = vastOf(f.day, f.slot);
+    if (!f.pending && document.activeElement !== f.input) f.input.value = displayed(f.weekId, f.day, f.slot);
+    f.cb.checked = v.vast;
+    f.toggle.classList.toggle("active", v.vast);
+    f.input.classList.toggle("is-vast", v.vast);
+  });
+  updateEmptyState();
+}
+
+function updateEmptyState() {
+  fields.forEach(f => f.input.classList.toggle("empty", !f.input.value.trim()));
+  document.querySelectorAll(".schema-block").forEach(block => {
+    let openTotal = 0;
+    block.querySelectorAll(".day-row").forEach(row => {
+      const open = row.querySelectorAll("input[type=text].empty").length;
+      openTotal += open;
+      row.classList.toggle("incomplete", open > 0);
+      row.classList.toggle("complete", open === 0);
+      const badge = row.querySelector(".day-badge");
+      badge.className = `day-badge ${open ? "open" : "done"}`;
+      badge.textContent = open ? `nog ${open} open` : "✓ compleet";
+    });
+    block.querySelector(".summary").textContent =
+      openTotal ? `Nog ${openTotal} ${openTotal === 1 ? "plek" : "plekken"} open` : "Alles ingevuld ✓";
+  });
+}
+
+/* ── Live koppeling ───────────────────────────────────────────────────── */
+
+function subscribe() {
+  unsubscribers.forEach(u => u && u());
+  const onError = e => { console.error(e); setStatus("Geen verbinding met de gedeelde database — probeer de pagina te verversen", true); };
+  unsubscribers = [
+    store.watch("vast", data => { vastData = data || {}; refreshAll(); }, onError),
+    ...weeks.map(w => store.watch(w.id, data => { weekData[w.id] = data || {}; refreshAll(); }, onError))
+  ];
+}
+
+let notesPending = false;
+function setupNotes() {
+  store.watch("notities", data => {
+    if (!notesPending && document.activeElement !== notesArea) notesArea.value = (data && data.text) || "";
+  });
+  notesArea.addEventListener("input", () => {
+    notesPending = true;
+    debounce("notities", async () => { await save("notities", { text: notesArea.value }); notesPending = false; });
+  });
+  notesArea.addEventListener("blur", () => { if (!timers.notities) notesPending = false; });
+}
+
+// Nieuwe week begonnen terwijl de pagina openstaat? Dan schuift alles automatisch door.
+function checkRollover() {
+  if (fmtISO(getMonday(new Date())) !== renderedMonday) {
+    buildWeeks();
+    subscribe();
+    loadWeather();
+  }
+}
+
+async function init() {
+  try {
+    store = isConfigured(firebaseConfig) ? await createFirestoreStore(firebaseConfig) : createLocalStore();
+  } catch (e) {
+    console.error(e);
+    setStatus("De gedeelde database kon niet geladen worden — controleer je internetverbinding", true);
+    return;
+  }
+  if (!store.shared) document.getElementById("demoBanner").hidden = false;
+
+  buildWeeks();
+  setupNotes();
+  subscribe();
+  loadWeather();
+  setStatus(store.shared ? "Live verbonden ✓ — wijzigingen zijn direct zichtbaar voor iedereen" : "Klaar (alleen op dit apparaat)");
+
+  setInterval(checkRollover, 60 * 1000);
+  setInterval(loadWeather, 3 * 60 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { checkRollover(); } });
+  window.addEventListener("online", () => setStatus("Weer online ✓"));
+  window.addEventListener("offline", () => setStatus("Offline — wijzigingen worden verstuurd zodra je weer verbinding hebt"));
+}
+
+init();

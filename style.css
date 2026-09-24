@@ -1,0 +1,185 @@
+/* Huisstijl overgenomen uit het prototype weekschema-paarden.html */
+:root {
+  --blue: #4472C4;
+  --blue-dark: #2f5090;
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --border: #d9dee5;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --accent: #e8f0fe;
+  --pin: #c47a1f;
+  --pin-bg: #fdf0dd;
+  --notes-bg: #fff9e6;
+  --notes-border: #f0dca0;
+  --empty-bg: #fff1e6;
+  --empty-border: #f3b27a;
+  --ok: #2e7d4f;
+  --ok-bg: #e5f4ea;
+  --open: #b4540f;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0 auto;
+  padding: 16px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  max-width: 760px;
+}
+@media (min-width: 1100px) {
+  body { max-width: 1240px; }
+  .weeks { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+}
+
+.subtitle { font-size: 13px; color: var(--muted); }
+.brand { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.brand .logo { width: 88px; height: 88px; flex-shrink: 0; border-radius: 50%; object-fit: cover; }
+.brand-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.stable-name { font-size: 22px; font-weight: bold; color: var(--blue-dark); font-family: Georgia, 'Times New Roman', serif; margin: 0; }
+
+.demo-banner {
+  background: #fdecea; border: 1px solid #f1b0a8; color: #8a2a1e;
+  border-radius: 8px; padding: 10px 12px; font-size: 12px; margin-bottom: 14px;
+}
+
+.notes-block {
+  background: var(--notes-bg);
+  border: 1px solid var(--notes-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+}
+.notes-block .notes-title {
+  display: block;
+  font-weight: bold;
+  font-size: 13px;
+  color: #8a6d1f;
+  margin-bottom: 6px;
+}
+.notes-block textarea {
+  width: 100%;
+  min-height: 90px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px; /* 16px voorkomt inzoomen op iPhone */
+  border: 1px solid var(--notes-border);
+  border-radius: 6px;
+  padding: 8px;
+  resize: vertical;
+  background: #fffef8;
+  color: var(--text);
+}
+.notes-block textarea:focus { outline: none; border-color: var(--pin); }
+
+.info {
+  background: var(--accent);
+  border: 1px solid #c9dcf7;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #3b5a8a;
+  margin-bottom: 18px;
+}
+.info summary { cursor: pointer; font-weight: bold; }
+.info p { margin: 8px 0 0; line-height: 1.45; }
+.legend-empty { background: var(--empty-bg); border: 1px solid var(--empty-border); border-radius: 4px; padding: 0 4px; color: var(--open); }
+
+.schema-block {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.schema-header {
+  padding: 12px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px 10px;
+  color: #fff;
+}
+.schema-header.current { background: var(--blue); }
+.schema-header.next { background: #8a94a6; }
+.schema-header .label { font-weight: bold; font-size: 14px; }
+.schema-header .range { font-size: 12px; opacity: 0.9; }
+.schema-header .summary { flex-basis: 100%; font-size: 12px; opacity: 0.95; }
+
+.day-row {
+  border-top: 1px solid var(--border);
+  border-left: 4px solid transparent;
+  padding: 10px 14px 10px 10px;
+}
+.day-row:first-of-type { border-top: none; }
+.day-row.incomplete { border-left-color: var(--empty-border); }
+.day-row.complete { border-left-color: #8cc7a1; }
+.day-row.today { background: #f7faff; }
+.day-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.day-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.day-name { font-weight: bold; font-size: 13px; color: var(--blue-dark); }
+.today-tag { font-size: 10px; font-weight: bold; color: #fff; background: var(--blue); border-radius: 10px; padding: 1px 7px; }
+.day-badge { font-size: 10px; font-weight: bold; border-radius: 10px; padding: 1px 7px; white-space: nowrap; }
+.day-badge.open { color: var(--open); background: var(--empty-bg); }
+.day-badge.done { color: var(--ok); background: var(--ok-bg); }
+.weather {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.weather .icon { font-size: 15px; }
+.group-row {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.group-label { font-size: 11px; font-weight: bold; color: var(--muted); padding-top: 10px; }
+.persons { display: flex; flex-direction: column; gap: 4px; }
+.person-row { display: flex; align-items: center; gap: 6px; }
+.person-row input[type="text"] {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px; /* 16px voorkomt inzoomen op iPhone */
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fafbfc;
+  color: var(--text);
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+}
+.person-row input[type="text"].empty { background: var(--empty-bg); border-color: var(--empty-border); }
+.person-row input[type="text"].empty::placeholder { color: #c98a55; }
+.person-row input[type="text"].is-vast { border-color: #e2b77c; background: #fffaf2; }
+.person-row input[type="text"]:focus { outline: none; border-color: var(--blue); background: #fff; }
+.vast-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--pin);
+  white-space: nowrap;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+}
+.vast-toggle.active { background: var(--pin-bg); font-weight: bold; }
+.vast-toggle input { margin: 0; width: 16px; height: 16px; accent-color: var(--pin); }
+.status { font-size: 11px; color: var(--muted); text-align: center; padding: 8px; min-height: 16px; }
+.status.error { color: #b42318; }

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Stal Windrakerhof planning</title>
+<meta name="description" content="Weekschema voor het buiten en binnen zetten van de paarden op Stal Windrakerhof.">
+<meta name="theme-color" content="#2f5090">
+<meta property="og:title" content="Stal Windrakerhof planning">
+<meta property="og:description" content="Wie zet deze week de paarden buiten en binnen? Vul je naam in.">
+<meta property="og:image" content="https://rraaiimmoonndd.github.io/stal-windrakerhof-planning/img/icon-512.png">
+<meta property="og:url" content="https://rraaiimmoonndd.github.io/stal-windrakerhof-planning/">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="brand">
+  <img class="logo" src="img/logo.jpg" alt="Logo Stal Windrakerhof" width="88" height="88">
+  <div class="brand-text">
+    <h1 class="stable-name">Stal Windrakerhof</h1>
+    <div class="subtitle">Planning buiten zetten &amp; binnen zetten, steeds 2 personen per taak</div>
+  </div>
+</header>
+
+<div id="demoBanner" class="demo-banner" hidden>
+  Deze pagina is nog niet gekoppeld aan de gedeelde database. Wat je invult wordt alleen op dit apparaat bewaard.
+</div>
+
+<section class="notes-block">
+  <label class="notes-title" for="notesArea">📌 Belangrijke notities</label>
+  <textarea id="notesArea" maxlength="4000" placeholder="Bijv. noodnummers, vaste afspraken, mededelingen..."></textarea>
+</section>
+
+<details class="info">
+  <summary>Hoe werkt dit schema?</summary>
+  <p>Vul je naam in bij een dag. Het wordt meteen opgeslagen en is voor iedereen met deze link zichtbaar.</p>
+  <p>Vink <strong>vast</strong> aan bij een naam om die persoon elke week automatisch op die dag terug te laten komen, tot iemand het weer uitvinkt.</p>
+  <p>Zodra een nieuwe week begint, schuift "Volgende week" vanzelf door naar "Deze week". <span class="legend-empty">Oranje</span> velden zijn nog niet ingevuld.</p>
+  <p>Het weerbericht (Puth, Limburg) komt van Open-Meteo.</p>
+</details>
+
+<main id="app" class="weeks"></main>
+<div class="status" id="status" role="status" aria-live="polite">Laden…</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+rules_version = '2';
+
+// Iedereen met de link mag lezen en schrijven, maar alleen in de vorm die de planning gebruikt:
+//   planning/notities            { text }
+//   planning/vast                { Maandag: { buiten1: { naam, vast } , ... }, ... }
+//   planning/week-JJJJ-MM-DD     { Maandag: { buiten1: "naam", ... }, ... }
+// Verwijderen kan niet, en namen/notities hebben een maximale lengte.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function days() {
+      return ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag'];
+    }
+    function slots() {
+      return ['buiten1', 'buiten2', 'binnen1', 'binnen2'];
+    }
+
+    function okName(m, s) {
+      return !(s in m) || (m[s] is string && m[s].size() <= 40);
+    }
+    function okWeekDay(data, d) {
+      return !(d in data) || (data[d] is map && data[d].keys().hasOnly(slots())
+        && okName(data[d], 'buiten1') && okName(data[d], 'buiten2')
+        && okName(data[d], 'binnen1') && okName(data[d], 'binnen2'));
+    }
+    function okWeek(data) {
+      return data.keys().hasOnly(days())
+        && okWeekDay(data, 'Maandag') && okWeekDay(data, 'Dinsdag') && okWeekDay(data, 'Woensdag')
+        && okWeekDay(data, 'Donderdag') && okWeekDay(data, 'Vrijdag') && okWeekDay(data, 'Zaterdag')
+        && okWeekDay(data, 'Zondag');
+    }
+
+    function okVastSlot(m, s) {
+      return !(s in m) || (m[s] is map && m[s].keys().hasOnly(['naam', 'vast'])
+        && (!('naam' in m[s]) || (m[s].naam is string && m[s].naam.size() <= 40))
+        && (!('vast' in m[s]) || m[s].vast is bool));
+    }
+    function okVastDay(data, d) {
+      return !(d in data) || (data[d] is map && data[d].keys().hasOnly(slots())
+        && okVastSlot(data[d], 'buiten1') && okVastSlot(data[d], 'buiten2')
+        && okVastSlot(data[d], 'binnen1') && okVastSlot(data[d], 'binnen2'));
+    }
+    function okVast(data) {
+      return data.keys().hasOnly(days())
+        && okVastDay(data, 'Maandag') && okVastDay(data, 'Dinsdag') && okVastDay(data, 'Woensdag')
+        && okVastDay(data, 'Donderdag') && okVastDay(data, 'Vrijdag') && okVastDay(data, 'Zaterdag')
+        && okVastDay(data, 'Zondag');
+    }
+
+    function okNotes(data) {
+      return data.keys().hasOnly(['text']) && data.text is string && data.text.size() <= 4000;
+    }
+
+    function okWrite(docId, data) {
+      return (docId == 'notities' && okNotes(data))
+        || (docId == 'vast' && okVast(data))
+        || (docId.matches('week-[0-9]{4}-[0-9]{2}-[0-9]{2}') && okWeek(data));
+    }
+
+    match /planning/{docId} {
+      allow read: if true;
+      allow create, update: if okWrite(docId, request.resource.data);
+      allow delete: if false;
+    }
+  }
+}
