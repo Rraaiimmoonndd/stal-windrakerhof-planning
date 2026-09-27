@@ -515,7 +515,61 @@ function checkRollover() {
   }
 }
 
+/* ── App op de telefoon ────────────────────────────────────────────────── */
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("./sw.js").catch(e => console.warn("Service worker niet geregistreerd", e));
+}
+
+// Installeerbalk: alleen in een gewone browsertab op een telefoon (of als de browser zelf installeren aanbiedt).
+function setupInstallBanner() {
+  const banner = document.getElementById("installBanner");
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  if (!banner || standalone) return;
+
+  const DISMISS_KEY = "windrakerhof:install-niet-tot";
+  let hiddenUntil = 0;
+  try { hiddenUntil = Number(localStorage.getItem(DISMISS_KEY)) || 0; } catch (e) { /* opslag geblokkeerd */ }
+  if (Date.now() < hiddenUntil) return;
+
+  const ua = navigator.userAgent || "";
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  const text = document.getElementById("installInstructions");
+  const button = document.getElementById("installButton");
+  const hide = () => { banner.hidden = true; };
+
+  document.getElementById("installDismiss").addEventListener("click", () => {
+    try { localStorage.setItem(DISMISS_KEY, String(Date.now() + 30 * 24 * 60 * 60 * 1000)); } catch (e) { /* opslag geblokkeerd */ }
+    hide();
+  });
+  window.addEventListener("appinstalled", hide);
+
+  if (isIOS) {
+    text.textContent = "Tik onderin op Delen (vierkantje met pijl) en kies ‘Zet op beginscherm’.";
+    banner.hidden = false;
+  } else if (isAndroid) {
+    text.textContent = "Tik in Chrome op ⋮ en kies ‘App installeren’ of ‘Toevoegen aan startscherm’.";
+    banner.hidden = false;
+  }
+
+  // Chrome en Edge bieden zelf een installeerknop aan.
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    text.textContent = "Met één tik op je beginscherm, ook bij slecht bereik in de stal.";
+    button.hidden = false;
+    button.onclick = () => {
+      e.prompt();
+      e.userChoice.then(choice => { if (choice && choice.outcome === "accepted") hide(); }).catch(() => {});
+    };
+    banner.hidden = false;
+  });
+}
+
 async function init() {
+  registerServiceWorker();
+  setupInstallBanner();
   try {
     store = isConfigured(firebaseConfig) ? await createFirestoreStore(firebaseConfig) : createLocalStore();
   } catch (e) {

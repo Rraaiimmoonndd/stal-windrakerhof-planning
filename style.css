@@ -256,3 +256,29 @@ body {
   .board-week, .board-week:not(.active) { display: block; }
   .board-week-title { display: block; }
 }
+
+/* ── Installeerbalk (app op de telefoon) ─────────────────────────────── */
+.install-banner:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent);
+  border: 1px solid #c9dcf7;
+  border-radius: 10px;
+  padding: 10px 10px 10px 12px;
+  margin-bottom: 14px;
+}
+.install-banner img { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
+.install-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 12px; color: #3b5a8a; line-height: 1.4; }
+.install-text strong { font-size: 13px; color: var(--blue-dark); }
+.install-button:not([hidden]) {
+  display: inline-block;
+  font: inherit; font-size: 13px; font-weight: bold;
+  background: var(--blue); color: #fff; border: 0; border-radius: 8px;
+  padding: 8px 12px; cursor: pointer; flex-shrink: 0;
+}
+.install-dismiss {
+  font: inherit; font-size: 14px; background: transparent; border: 0; color: var(--muted);
+  width: 32px; height: 32px; border-radius: 8px; cursor: pointer; flex-shrink: 0;
+}
+.install-dismiss:hover { background: rgba(0, 0, 0, 0.05); }

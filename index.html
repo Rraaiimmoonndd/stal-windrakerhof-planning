@@ -13,6 +13,10 @@
 <meta property="og:type" content="website">
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Windrakerhof">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -25,6 +29,16 @@
     <div class="subtitle">Planning buiten zetten &amp; binnen zetten, steeds 2 personen per taak</div>
   </div>
 </header>
+
+<div id="installBanner" class="install-banner" hidden>
+  <img src="img/favicon.png" alt="" width="36" height="36">
+  <div class="install-text">
+    <strong>Zet de planning als app op je telefoon</strong>
+    <span id="installInstructions">Hij opent dan als app, ook bij slecht bereik in de stal.</span>
+  </div>
+  <button type="button" id="installButton" class="install-button" hidden>Installeren</button>
+  <button type="button" id="installDismiss" class="install-dismiss" aria-label="Niet nu" title="Niet nu">✕</button>
+</div>
 
 <div id="demoBanner" class="demo-banner" hidden>
   Deze pagina is nog niet gekoppeld aan de gedeelde database. Wat je invult wordt alleen op dit apparaat bewaard.
