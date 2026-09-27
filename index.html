@@ -35,6 +35,18 @@
   <textarea id="notesArea" maxlength="4000" placeholder="Bijv. noodnummers, vaste afspraken, mededelingen..."></textarea>
 </section>
 
+<section class="board" aria-labelledby="boardTitle">
+  <div class="board-head">
+    <h2 id="boardTitle" class="board-title">📋 Wie doet wat?</h2>
+    <div class="board-switch" role="tablist" aria-label="Kies week">
+      <button type="button" role="tab" data-board="0" aria-selected="true">Deze week</button>
+      <button type="button" role="tab" data-board="1" aria-selected="false">Volgende week</button>
+    </div>
+  </div>
+  <div id="boardWeeks" class="board-weeks"></div>
+  <p class="board-hint">Tik op een dag om die hieronder in te vullen.</p>
+</section>
+
 <details class="info">
   <summary>Hoe werkt dit schema?</summary>
   <p>Vul je naam in bij een dag. Het wordt meteen opgeslagen en is voor iedereen met deze link zichtbaar.</p>

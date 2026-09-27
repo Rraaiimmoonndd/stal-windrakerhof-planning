@@ -200,3 +200,59 @@ body {
 .vast-toggle input { margin: 0; width: 16px; height: 16px; accent-color: var(--pin); }
 .status { font-size: 11px; color: var(--muted); text-align: center; padding: 8px; min-height: 16px; }
 .status.error { color: #b42318; }
+
+/* ── Bord: wie doet wat ─────────────────────────────────────────────── */
+.board {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 12px 8px;
+  margin-bottom: 18px;
+}
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.board-title { font-size: 16px; margin: 0; color: var(--blue-dark); }
+.board-switch { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.board-switch button {
+  font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--muted);
+  padding: 6px 10px; border-radius: 6px; cursor: pointer;
+}
+.board-switch button.active { background: var(--blue); color: #fff; font-weight: bold; }
+.board-week { display: none; }
+.board-week.active { display: block; }
+.board-week-title { display: none; font-size: 12px; font-weight: bold; color: #fff; padding: 6px 10px; border-radius: 6px 6px 0 0; }
+.board-week-title.current { background: var(--blue); }
+.board-week-title.next { background: #8a94a6; }
+
+.board-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.board-table thead th {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+  text-align: left; padding: 4px 6px 6px; border-bottom: 2px solid var(--border);
+}
+.board-table thead th:first-child { width: 74px; }
+.board-table thead th.col-buiten { color: #2e7d4f; }
+.board-table thead th.col-binnen { color: var(--blue-dark); }
+.board-table tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; }
+.board-table tbody tr:last-child { border-bottom: 0; }
+.board-table tbody tr:hover, .board-table tbody tr:focus-visible { background: #f7f9fc; outline: none; }
+.board-table tbody th, .board-table td { padding: 7px 6px; vertical-align: top; text-align: left; }
+.board-table tbody th { font-weight: normal; }
+.b-day { display: block; font-weight: bold; font-size: 13px; color: var(--blue-dark); white-space: nowrap; }
+.b-weather { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+.b-today { display: inline-block; font-size: 10px; font-weight: bold; color: #fff; background: var(--blue); border-radius: 10px; padding: 0 6px; margin-top: 2px; }
+.b-time {
+  display: inline-block; font-size: 12px; font-weight: bold; color: var(--text);
+  background: var(--accent); border-radius: 4px; padding: 0 5px; margin-bottom: 2px;
+}
+.b-name { display: block; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.b-open { display: block; font-size: 12px; font-weight: bold; color: var(--open); line-height: 1.5; }
+.board-table tr.today { background: #eef4ff; box-shadow: inset 4px 0 0 var(--blue); }
+.board-table tr.past { opacity: .45; }
+.board-hint { font-size: 11px; color: var(--muted); margin: 8px 2px 0; }
+.day-row { scroll-margin-top: 12px; }
+
+@media (min-width: 1100px) {
+  .board-switch { display: none; }
+  .board-weeks { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .board-week, .board-week:not(.active) { display: block; }
+  .board-week-title { display: block; }
+}

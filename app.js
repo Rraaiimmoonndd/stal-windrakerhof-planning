@@ -140,6 +140,7 @@ function updateWeather() {
     el.append(icon, `${cat.label}, ${w.avg}°C`);
     el.title = `${cat.label}, gemiddeld ${w.avg}°C`;
   });
+  renderBoard();
 }
 
 /* ── Staat ────────────────────────────────────────────────────────────── */
@@ -228,6 +229,7 @@ function renderBlock(week) {
     const row = document.createElement("div");
     row.className = "day-row";
     row.dataset.day = day;
+    row.id = `dag-${week.id}-${day}`;
     if (fmtISO(date) === todayISO) row.classList.add("today");
 
     const top = document.createElement("div");
@@ -336,6 +338,117 @@ function renderField(week, day, slot, aria, kind = "name") {
   return personRow;
 }
 
+/* ── Bord: in één oogopslag wie welke dag buiten en binnen zet ────────── */
+
+const boardWeeksEl = document.getElementById("boardWeeks");
+let boardIndex = 0; // welke week het bord op de telefoon toont (op een breed scherm staan ze naast elkaar)
+
+function setupBoard() {
+  document.querySelectorAll(".board-switch [data-board]").forEach(btn => {
+    btn.addEventListener("click", () => { boardIndex = Number(btn.dataset.board); renderBoard(); });
+  });
+}
+
+function boardCell(weekId, day, group) {
+  const td = document.createElement("td");
+  const time = displayed(weekId, day, `${group}Tijd`);
+  if (time) {
+    const t = document.createElement("span");
+    t.className = "b-time";
+    t.textContent = time;
+    td.appendChild(t);
+  }
+  const names = [1, 2].map(n => displayed(weekId, day, `${group}${n}`).trim());
+  if (!names[0] && !names[1]) {
+    const open = document.createElement("span");
+    open.className = "b-open";
+    open.textContent = "nog niemand";
+    td.appendChild(open);
+    return td;
+  }
+  names.forEach(name => {
+    const el = document.createElement("span");
+    el.className = name ? "b-name" : "b-open";
+    el.textContent = name || "+ 1 open";
+    td.appendChild(el);
+  });
+  return td;
+}
+
+function renderBoard() {
+  if (!weeks.length) return;
+  const todayISO = fmtISO(new Date());
+  document.querySelectorAll(".board-switch [data-board]").forEach(btn => {
+    const active = Number(btn.dataset.board) === boardIndex;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", String(active));
+  });
+
+  boardWeeksEl.replaceChildren(...weeks.map((week, idx) => {
+    const wrap = document.createElement("div");
+    wrap.className = "board-week" + (idx === boardIndex ? " active" : "");
+    const title = document.createElement("div");
+    title.className = `board-week-title ${week.css}`;
+    title.textContent = `${idx === 0 ? "Deze week" : "Volgende week"} · ${fmtRange(week.monday)}`;
+
+    const table = document.createElement("table");
+    table.className = "board-table";
+    const head = table.createTHead().insertRow();
+    ["Dag", "Buiten", "Binnen"].forEach((label, i) => {
+      const th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = label;
+      if (i) th.className = i === 1 ? "col-buiten" : "col-binnen";
+      head.appendChild(th);
+    });
+    const body = table.createTBody();
+
+    DAYS.forEach((day, i) => {
+      const date = addDays(week.monday, i);
+      const iso = fmtISO(date);
+      const tr = body.insertRow();
+      if (iso === todayISO) tr.classList.add("today");
+      else if (iso < todayISO) tr.classList.add("past");
+
+      const th = document.createElement("th");
+      th.scope = "row";
+      const name = document.createElement("span");
+      name.className = "b-day";
+      name.textContent = `${day.slice(0, 2)} ${fmtDayDate(date)}`;
+      th.appendChild(name);
+      if (iso === todayISO) {
+        const tag = document.createElement("span");
+        tag.className = "b-today";
+        tag.textContent = "vandaag";
+        th.appendChild(tag);
+      }
+      const w = weatherByDate[iso];
+      if (w) {
+        const wx = document.createElement("span");
+        wx.className = "b-weather";
+        const cat = weatherCategory(w.code);
+        wx.textContent = `${cat.icon} ${w.avg}°`;
+        wx.title = `${cat.label}, gemiddeld ${w.avg}°C`;
+        th.appendChild(wx);
+      }
+      tr.append(th, boardCell(week.id, day, "buiten"), boardCell(week.id, day, "binnen"));
+
+      // Tik op een dag: spring naar die dag in het invulgedeelte.
+      tr.tabIndex = 0;
+      tr.setAttribute("aria-label", `${day} ${fmtDayDate(date)} invullen`);
+      const jump = () => {
+        const target = document.getElementById(`dag-${week.id}-${day}`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+      tr.addEventListener("click", jump);
+      tr.addEventListener("keydown", e => { if (e.key === "Enter") jump(); });
+    });
+
+    wrap.append(title, table);
+    return wrap;
+  }));
+}
+
 function refreshAll() {
   fields.forEach(f => {
     const v = vastOf(f.day, f.slot);
@@ -345,6 +458,7 @@ function refreshAll() {
     f.input.classList.toggle("is-vast", v.vast);
   });
   updateEmptyState();
+  renderBoard();
 }
 
 function updateEmptyState() {
@@ -408,6 +522,7 @@ async function init() {
   }
   if (!store.shared) document.getElementById("demoBanner").hidden = false;
 
+  setupBoard();
   buildWeeks();
   setupNotes();
   subscribe();
