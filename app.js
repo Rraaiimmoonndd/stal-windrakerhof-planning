@@ -536,6 +536,9 @@ function setupInstallBanner() {
   const ua = navigator.userAgent || "";
   const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const isAndroid = /Android/i.test(ua);
+  // Samsung Internet bouwt bij "Installeren" zelf een app voor een oude Android-versie, die Google Play
+  // Protect blokkeert ("Onveilige app geblokkeerd"). Daar wijzen we de snelkoppeling of Chrome aan.
+  const isSamsung = /SamsungBrowser/i.test(ua);
   const text = document.getElementById("installInstructions");
   const button = document.getElementById("installButton");
   const hide = () => { banner.hidden = true; };
@@ -549,6 +552,13 @@ function setupInstallBanner() {
   if (isIOS) {
     text.textContent = "Tik onderin op Delen (vierkantje met pijl) en kies ‘Zet op beginscherm’.";
     banner.hidden = false;
+    return; // iPhone kent geen installeerknop; de Delen-uitleg is de enige route
+  } else if (isSamsung) {
+    text.textContent = "Tik rechtsonder op ☰ → ‘Pagina toevoegen aan’ → ‘Startscherm’ (niet ‘Installeren’). Of open deze link in Chrome.";
+    banner.hidden = false;
+    // Geen installeerknop, en ook Samsungs eigen installeervoorstel onderdrukken: beide maken de geblokkeerde app.
+    window.addEventListener("beforeinstallprompt", (e) => e.preventDefault());
+    return;
   } else if (isAndroid) {
     text.textContent = "Tik in Chrome op ⋮ en kies ‘App installeren’ of ‘Toevoegen aan startscherm’.";
     banner.hidden = false;
