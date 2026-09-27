@@ -166,6 +166,23 @@ body {
 .person-row input[type="text"].empty::placeholder { color: #c98a55; }
 .person-row input[type="text"].is-vast { border-color: #e2b77c; background: #fffaf2; }
 .person-row input[type="text"]:focus { outline: none; border-color: var(--blue); background: #fff; }
+.time-row { gap: 6px; }
+.time-row .time-icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+.person-row input[type="time"] {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px; /* 16px voorkomt inzoomen op iPhone */
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fafbfc;
+  color: var(--text);
+  width: 140px;
+  min-height: 36px;
+  flex: 0 0 auto;
+}
+.person-row input[type="time"]:focus { outline: none; border-color: var(--blue); background: #fff; }
+.person-row input[type="time"].is-vast { border-color: #e2b77c; background: #fffaf2; }
+.time-row .vast-toggle { margin-left: auto; }
 .vast-toggle {
   display: flex;
   align-items: center;

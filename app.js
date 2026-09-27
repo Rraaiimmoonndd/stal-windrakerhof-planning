@@ -262,6 +262,7 @@ function renderBlock(week) {
       gl.textContent = group === "buiten" ? "Buiten" : "Binnen";
       const persons = document.createElement("div");
       persons.className = "persons";
+      persons.appendChild(renderField(week, day, `${group}Tijd`, `${gl.textContent} zetten, ${day} ${fmtDayDate(date)}, tijd`, "time"));
       [1, 2].forEach(n => persons.appendChild(renderField(week, day, `${group}${n}`, `${gl.textContent} zetten, ${day} ${fmtDayDate(date)}, persoon ${n}`)));
       groupRow.append(gl, persons);
       row.appendChild(groupRow);
@@ -271,20 +272,31 @@ function renderBlock(week) {
   return block;
 }
 
-function renderField(week, day, slot, aria) {
+// kind "name": invulveld voor een naam (telt mee als open plek); kind "time": buiten-/binnenzettijd (optioneel).
+function renderField(week, day, slot, aria, kind = "name") {
   const personRow = document.createElement("div");
-  personRow.className = "person-row";
+  personRow.className = kind === "time" ? "person-row time-row" : "person-row";
 
   const input = document.createElement("input");
-  input.type = "text";
-  input.placeholder = "naam";
-  input.maxLength = 40;
-  input.autocomplete = "off";
   input.setAttribute("aria-label", aria);
+  if (kind === "time") {
+    input.type = "time";
+    input.step = 300; // stappen van 5 minuten in de tijdkiezer
+    const icon = document.createElement("span");
+    icon.className = "time-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "🕗";
+    personRow.appendChild(icon);
+  } else {
+    input.type = "text";
+    input.placeholder = "naam";
+    input.maxLength = 40;
+    input.autocomplete = "off";
+  }
 
   const toggle = document.createElement("label");
   toggle.className = "vast-toggle";
-  toggle.title = "Elke week automatisch terug laten komen";
+  toggle.title = kind === "time" ? "Deze tijd elke week automatisch terug laten komen" : "Elke week automatisch terug laten komen";
   const cb = document.createElement("input");
   cb.type = "checkbox";
   toggle.append(cb, "vast");
@@ -294,7 +306,7 @@ function renderField(week, day, slot, aria) {
   fields.push(field);
   const key = `${week.id}|${day}|${slot}`;
 
-  input.addEventListener("input", () => {
+  const onEdit = () => {
     field.pending = true;
     updateEmptyState();
     const value = input.value.trim() ? input.value : "";
@@ -304,7 +316,9 @@ function renderField(week, day, slot, aria) {
       if (vastOf(day, slot).vast) writes.push(save("vast", { [day]: { [slot]: { naam: value, vast: true } } }));
       return Promise.all(writes);
     });
-  });
+  };
+  input.addEventListener("input", onEdit);
+  if (kind === "time") input.addEventListener("change", onEdit); // iOS meldt een gekozen tijd pas bij "change"
   input.addEventListener("blur", () => { if (!timers[key]) { field.pending = false; refreshAll(); } });
 
   cb.addEventListener("change", () => {
@@ -334,7 +348,8 @@ function refreshAll() {
 }
 
 function updateEmptyState() {
-  fields.forEach(f => f.input.classList.toggle("empty", !f.input.value.trim()));
+  // Alleen namen tellen als open plek; een tijd is optioneel.
+  fields.forEach(f => { if (f.input.type === "text") f.input.classList.toggle("empty", !f.input.value.trim()); });
   document.querySelectorAll(".schema-block").forEach(block => {
     let openTotal = 0;
     block.querySelectorAll(".day-row").forEach(row => {

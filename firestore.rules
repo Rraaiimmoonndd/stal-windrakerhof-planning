@@ -2,49 +2,63 @@ rules_version = '2';
 
 // Iedereen met de link mag lezen en schrijven, maar alleen in de vorm die de planning gebruikt:
 //   planning/notities            { text }
-//   planning/vast                { Maandag: { buiten1: { naam, vast } , ... }, ... }
-//   planning/week-JJJJ-MM-DD     { Maandag: { buiten1: "naam", ... }, ... }
-// Verwijderen kan niet, en namen/notities hebben een maximale lengte.
+//   planning/vast                { Maandag: { buiten1: { naam, vast }, buitenTijd: { naam, vast }, ... }, ... }
+//   planning/week-JJJJ-MM-DD     { Maandag: { buiten1: "naam", buitenTijd: "08:00", ... }, ... }
+// Verwijderen kan niet, en namen/tijden/notities hebben een maximale lengte.
+//
+// Alleen de dagen die bij een opslag veranderen worden gecontroleerd. Firebase staat per
+// opslag maar een beperkt aantal controles toe; het hele document nalopen liep daarop vast
+// zodra er veel vaste namen waren.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function days() {
       return ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag'];
     }
-    function slots() {
-      return ['buiten1', 'buiten2', 'binnen1', 'binnen2'];
+    function fields() {
+      return ['buiten1', 'buiten2', 'binnen1', 'binnen2', 'buitenTijd', 'binnenTijd'];
     }
 
-    function okName(m, s) {
-      return !(s in m) || (m[s] is string && m[s].size() <= 40);
-    }
-    function okWeekDay(data, d) {
-      return !(d in data) || (data[d] is map && data[d].keys().hasOnly(slots())
-        && okName(data[d], 'buiten1') && okName(data[d], 'buiten2')
-        && okName(data[d], 'binnen1') && okName(data[d], 'binnen2'));
-    }
-    function okWeek(data) {
-      return data.keys().hasOnly(days())
-        && okWeekDay(data, 'Maandag') && okWeekDay(data, 'Dinsdag') && okWeekDay(data, 'Woensdag')
-        && okWeekDay(data, 'Donderdag') && okWeekDay(data, 'Vrijdag') && okWeekDay(data, 'Zaterdag')
-        && okWeekDay(data, 'Zondag');
+    // Dagen die deze opslag toevoegt of wijzigt.
+    function changedDays() {
+      return resource == null
+        ? request.resource.data.keys().toSet()
+        : request.resource.data.diff(resource.data).affectedKeys();
     }
 
-    function okVastSlot(m, s) {
-      return !(s in m) || (m[s] is map && m[s].keys().hasOnly(['naam', 'vast'])
-        && (!('naam' in m[s]) || (m[s].naam is string && m[s].naam.size() <= 40))
-        && (!('vast' in m[s]) || m[s].vast is bool));
+    function okText(m, f) {
+      return !(f in m) || (m[f] is string && m[f].size() <= 40);
     }
-    function okVastDay(data, d) {
-      return !(d in data) || (data[d] is map && data[d].keys().hasOnly(slots())
-        && okVastSlot(data[d], 'buiten1') && okVastSlot(data[d], 'buiten2')
-        && okVastSlot(data[d], 'binnen1') && okVastSlot(data[d], 'binnen2'));
+    function okWeekDay(day) {
+      return day is map && day.keys().hasOnly(fields())
+        && okText(day, 'buiten1') && okText(day, 'buiten2')
+        && okText(day, 'binnen1') && okText(day, 'binnen2')
+        && okText(day, 'buitenTijd') && okText(day, 'binnenTijd');
     }
-    function okVast(data) {
+
+    function okVastEntry(m, f) {
+      return !(f in m) || (m[f] is map && m[f].keys().hasOnly(['naam', 'vast'])
+        && okText(m[f], 'naam')
+        && (!('vast' in m[f]) || m[f].vast is bool));
+    }
+    function okVastDay(day) {
+      return day is map && day.keys().hasOnly(fields())
+        && okVastEntry(day, 'buiten1') && okVastEntry(day, 'buiten2')
+        && okVastEntry(day, 'binnen1') && okVastEntry(day, 'binnen2')
+        && okVastEntry(day, 'buitenTijd') && okVastEntry(day, 'binnenTijd');
+    }
+
+    // Controleer alleen gewijzigde dagen; welke controle hoort bij het document staat in isVast.
+    function okDay(data, ch, d, isVast) {
+      return !(d in ch) || (isVast ? okVastDay(data[d]) : okWeekDay(data[d]));
+    }
+    function okSchedule(data, isVast) {
+      let ch = changedDays();
       return data.keys().hasOnly(days())
-        && okVastDay(data, 'Maandag') && okVastDay(data, 'Dinsdag') && okVastDay(data, 'Woensdag')
-        && okVastDay(data, 'Donderdag') && okVastDay(data, 'Vrijdag') && okVastDay(data, 'Zaterdag')
-        && okVastDay(data, 'Zondag');
+        && okDay(data, ch, 'Maandag', isVast) && okDay(data, ch, 'Dinsdag', isVast)
+        && okDay(data, ch, 'Woensdag', isVast) && okDay(data, ch, 'Donderdag', isVast)
+        && okDay(data, ch, 'Vrijdag', isVast) && okDay(data, ch, 'Zaterdag', isVast)
+        && okDay(data, ch, 'Zondag', isVast);
     }
 
     function okNotes(data) {
@@ -53,8 +67,8 @@ service cloud.firestore {
 
     function okWrite(docId, data) {
       return (docId == 'notities' && okNotes(data))
-        || (docId == 'vast' && okVast(data))
-        || (docId.matches('week-[0-9]{4}-[0-9]{2}-[0-9]{2}') && okWeek(data));
+        || (docId == 'vast' && okSchedule(data, true))
+        || (docId.matches('week-[0-9]{4}-[0-9]{2}-[0-9]{2}') && okSchedule(data, false));
     }
 
     match /planning/{docId} {
