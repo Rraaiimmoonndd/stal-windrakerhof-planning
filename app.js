@@ -199,6 +199,9 @@ function buildWeeks() {
     { title: "Volgende week", css: "next", monday: next, id: weekDocId(next) }
   ];
   fields = [];
+  // Op zaterdag en zondag is "deze week" bijna voorbij: laat het bord dan standaard volgende week zien.
+  const weekday = new Date().getDay();
+  boardIndex = (weekday === 6 || weekday === 0) ? 1 : 0;
   app.replaceChildren(...weeks.map(renderBlock));
   refreshAll();
   updateWeather();
