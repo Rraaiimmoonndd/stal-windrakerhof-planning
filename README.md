@@ -4,7 +4,7 @@ Weekschema voor het buiten en binnen zetten van de paarden, gedeeld via een link
 
 - Twee weken tegelijk: **Deze week (actueel)** en **Volgende week**, maandag t/m zondag.
 - Per dag 2 personen voor *buiten zetten* en 2 voor *binnen zetten*.
-- **Vast**-vinkje: die naam komt elke week automatisch terug op die dag, tot iemand het uitvinkt.
+- **Vast**-vinkje: die naam komt vanaf die week elke week automatisch terug op die dag, tot iemand het uitvinkt. Eerdere weken veranderen niet mee.
 - Nieuwe week? Dan schuift het schema vanzelf door.
 - Gedeeld notitieveld, oranje markering voor lege plekken, weerbericht voor Puth (Open-Meteo).
 - Alles wordt live gedeeld via Firebase Firestore; inloggen is niet nodig.

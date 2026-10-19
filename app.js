@@ -148,7 +148,7 @@ function updateWeather() {
 let store;
 let weeks = [];          // [{title, css, monday, id}]
 let weekData = {};       // id -> {Maandag: {buiten1: "..."}}
-let vastData = {};       // {Maandag: {buiten1: {naam, vast}}}
+let vastData = {};       // {Maandag: {buiten1: {naam, vast, vanaf}}}
 let fields = [];         // {weekId, day, slot, input, toggle, cb, pending}
 let unsubscribers = [];
 let renderedMonday = null;
@@ -156,16 +156,39 @@ let savingCount = 0;
 
 function vastOf(day, slot) {
   const v = vastData[day] && vastData[day][slot];
-  return { naam: (v && typeof v.naam === "string") ? v.naam : "", vast: !!(v && v.vast) };
+  return {
+    naam: (v && typeof v.naam === "string") ? v.naam : "",
+    vast: !!(v && v.vast),
+    vanaf: (v && typeof v.vanaf === "string") ? v.vanaf : ""
+  };
+}
+function weekMonday(weekId) { return weekId.slice("week-".length); } // "week-2026-10-19" -> "2026-10-19"
+// Vast geldt vanaf de week waarin het is aangezet ("vanaf" = maandag van die week), nooit voor eerdere weken.
+// Oudere vaste namen zonder "vanaf" gelden voor alle weken, zoals voorheen.
+function vastApplies(weekId, day, slot) {
+  const v = vastOf(day, slot);
+  return v.vast && (!v.vanaf || weekMonday(weekId) >= v.vanaf);
 }
 function stored(weekId, day, slot) {
   const w = weekData[weekId];
   return (w && w[day] && typeof w[day][slot] === "string") ? w[day][slot] : "";
 }
-// Een vaste naam gaat altijd voor (zoals in het prototype); anders geldt wat er voor die week is ingevuld.
+// Een vaste naam gaat voor in de weken waarvoor hij geldt; anders geldt wat er voor die week is ingevuld.
 function displayed(weekId, day, slot) {
-  const v = vastOf(day, slot);
-  return v.vast ? v.naam : stored(weekId, day, slot);
+  return vastApplies(weekId, day, slot) ? vastOf(day, slot).naam : stored(weekId, day, slot);
+}
+
+// Zet vast aan of uit vanaf deze week (of wijzig de vaste naam vanaf deze week).
+// Eerdere weken houden precies wat ze nu tonen: hun naam wordt in die week zelf vastgelegd.
+function setVast(week, day, slot, naam, checked) {
+  const vanaf = weekMonday(week.id);
+  // Eerst alles uitrekenen: elke opslag kan meteen een verversing van het scherm veroorzaken.
+  const perWeek = weeks.map(w => [w.id, checked && weekMonday(w.id) >= vanaf ? naam : displayed(w.id, day, slot)]);
+  const entry = { naam, vast: checked, vanaf };
+  vastData = { ...vastData, [day]: { ...(vastData[day] || {}), [slot]: entry } };
+  const writes = [save("vast", { [day]: { [slot]: entry } })];
+  perWeek.forEach(([id, value]) => writes.push(save(id, { [day]: { [slot]: value } })));
+  return Promise.all(writes);
 }
 
 async function save(docId, patch) {
@@ -317,9 +340,9 @@ function renderField(week, day, slot, aria, kind = "name") {
     const value = input.value.trim() ? input.value : "";
     debounce(key, () => {
       field.pending = false;
-      const writes = [save(week.id, { [day]: { [slot]: value } })];
-      if (vastOf(day, slot).vast) writes.push(save("vast", { [day]: { [slot]: { naam: value, vast: true } } }));
-      return Promise.all(writes);
+      // Vaste naam gewijzigd? Dan geldt de nieuwe naam vanaf deze week; eerdere weken houden de oude.
+      if (vastApplies(week.id, day, slot)) return setVast(week, day, slot, value, true);
+      return save(week.id, { [day]: { [slot]: value } });
     });
   };
   input.addEventListener("input", onEdit);
@@ -327,14 +350,9 @@ function renderField(week, day, slot, aria, kind = "name") {
   input.addEventListener("blur", () => { if (!timers[key]) { field.pending = false; refreshAll(); } });
 
   cb.addEventListener("change", () => {
-    // Eerst alles uitrekenen: elke opslag kan meteen een verversing van het scherm veroorzaken.
-    const checked = cb.checked;
     const naam = input.value.trim() ? input.value : "";
-    // Zet de naam ook in beide zichtbare weken, zodat hij daar blijft staan (ook na uitvinken).
-    const perWeek = weeks.map(w => [w.id, checked ? naam : displayed(w.id, day, slot)]);
-    vastData = { ...vastData, [day]: { ...(vastData[day] || {}), [slot]: { naam, vast: checked } } };
-    save("vast", { [day]: { [slot]: { naam, vast: checked } } });
-    perWeek.forEach(([id, value]) => save(id, { [day]: { [slot]: value } }));
+    // De naam blijft ook na uitvinken staan in de zichtbare weken.
+    setVast(week, day, slot, naam, cb.checked);
     refreshAll();
   });
 
@@ -454,11 +472,11 @@ function renderBoard() {
 
 function refreshAll() {
   fields.forEach(f => {
-    const v = vastOf(f.day, f.slot);
+    const isVast = vastApplies(f.weekId, f.day, f.slot);
     if (!f.pending && document.activeElement !== f.input) f.input.value = displayed(f.weekId, f.day, f.slot);
-    f.cb.checked = v.vast;
-    f.toggle.classList.toggle("active", v.vast);
-    f.input.classList.toggle("is-vast", v.vast);
+    f.cb.checked = isVast;
+    f.toggle.classList.toggle("active", isVast);
+    f.input.classList.toggle("is-vast", isVast);
   });
   updateEmptyState();
   renderBoard();
