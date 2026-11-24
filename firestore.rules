@@ -5,6 +5,9 @@ rules_version = '2';
 //   planning/vast                { Maandag: { buiten1: { naam, vast, vanaf }, buitenTijd: { naam, vast, vanaf }, ... }, ... }
 //                                (vanaf = maandag van de week waarin vast is aangezet, JJJJ-MM-DD)
 //   planning/week-JJJJ-MM-DD     { Maandag: { buiten1: "naam", buitenTijd: "08:00", ... }, ... }
+//   planning/weide-huidig        { foto: "data:image/jpeg;base64,...", geplaatst: "2026-11-24T19:30:00.000Z" }
+//   planning/weide-vorige        idem: de indeling van vóór de laatste nieuwe foto
+//                                (foto max. 900.000 tekens; een Firestore-document mag max. 1 MB zijn)
 // Verwijderen kan niet, en namen/tijden/notities hebben een maximale lengte.
 //
 // Alleen de dagen die bij een opslag veranderen worden gecontroleerd. Firebase staat per
@@ -67,8 +70,16 @@ service cloud.firestore {
       return data.keys().hasOnly(['text']) && data.text is string && data.text.size() <= 4000;
     }
 
+    function okWeide(data) {
+      return data.keys().hasOnly(['foto', 'geplaatst'])
+        && data.foto is string && data.foto.size() <= 900000
+        && data.foto[0:23] == 'data:image/jpeg;base64,'
+        && data.geplaatst is string && data.geplaatst.size() <= 40;
+    }
+
     function okWrite(docId, data) {
       return (docId == 'notities' && okNotes(data))
+        || ((docId == 'weide-huidig' || docId == 'weide-vorige') && okWeide(data))
         || (docId == 'vast' && okSchedule(data, true))
         || (docId.matches('week-[0-9]{4}-[0-9]{2}-[0-9]{2}') && okSchedule(data, false));
     }

@@ -49,6 +49,38 @@
   <textarea id="notesArea" maxlength="4000" placeholder="Bijv. noodnummers, vaste afspraken, mededelingen..."></textarea>
 </section>
 
+<section class="wei-block" aria-labelledby="weiTitle">
+  <div class="wei-head">
+    <h2 id="weiTitle" class="wei-title">🐴 Wei-indeling</h2>
+    <label class="wei-upload" id="weiUploadLabel">
+      📷 Nieuwe foto
+      <input type="file" id="weiInput" accept="image/*" hidden>
+    </label>
+  </div>
+  <button type="button" id="weiOpen" class="wei-thumb" hidden>
+    <img id="weiThumb" alt="Foto van de huidige wei-indeling">
+    <span class="wei-open-hint">Tik om te openen</span>
+  </button>
+  <p id="weiEmpty" class="wei-meta">Nog geen foto van de wei-indeling. Maak er een met ‘Nieuwe foto’.</p>
+  <p id="weiMeta" class="wei-meta" hidden></p>
+  <p id="weiPrev" class="wei-meta" hidden>
+    Vorige indeling (<span id="weiPrevDate"></span>):
+    <button type="button" id="weiPrevOpen" class="wei-link">bekijken</button> ·
+    <button type="button" id="weiRestore" class="wei-link">terugzetten</button>
+  </p>
+</section>
+
+<dialog id="weiDialog" class="wei-dialog" aria-label="Wei-indeling">
+  <div class="wei-dialog-bar">
+    <span id="weiDialogTitle">Wei-indeling</span>
+    <button type="button" id="weiZoom" class="wei-dialog-btn">Inzoomen</button>
+    <button type="button" id="weiClose" class="wei-dialog-btn" aria-label="Sluiten">✕</button>
+  </div>
+  <div class="wei-dialog-body" id="weiDialogBody">
+    <img id="weiFull" alt="Wei-indeling">
+  </div>
+</dialog>
+
 <section class="board" aria-labelledby="boardTitle">
   <div class="board-head">
     <h2 id="boardTitle" class="board-title">📋 Wie doet wat?</h2>
@@ -67,6 +99,7 @@
   <p>Vink <strong>vast</strong> aan bij een naam om die persoon elke week automatisch op die dag terug te laten komen, tot iemand het weer uitvinkt.</p>
   <p>Bij 🕗 kun je per dag de tijd van buiten zetten en binnen zetten invullen. Ook een tijd kun je <strong>vast</strong> zetten.</p>
   <p>Zodra een nieuwe week begint, schuift "Volgende week" vanzelf door naar "Deze week". <span class="legend-empty">Oranje</span> velden zijn nog niet ingevuld.</p>
+  <p>Bij <strong>Wei-indeling</strong> staat een foto van het whiteboard in de stal. Tik erop om hem groot te bekijken. Hangt er een nieuwe indeling? Kies ‘Nieuwe foto’; de vorige blijft bewaard en kun je terugzetten als er iets misging.</p>
   <p>Het weerbericht (Puth, Limburg) komt van Open-Meteo.</p>
 </details>
 

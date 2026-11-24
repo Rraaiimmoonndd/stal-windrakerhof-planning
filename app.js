@@ -62,6 +62,12 @@ async function createFirestoreStore(cfg) {
     },
     merge(id, patch) {
       return fs.setDoc(fs.doc(db, "planning", id), patch, { merge: true });
+    },
+    // Meerdere documenten in één keer vervangen: alles lukt, of niets.
+    replaceAll(entries) {
+      const batch = fs.writeBatch(db);
+      entries.forEach(([id, data]) => batch.set(fs.doc(db, "planning", id), data));
+      return batch.commit();
     }
   };
 }
@@ -89,6 +95,10 @@ function createLocalStore() {
     async merge(id, patch) {
       try { localStorage.setItem(PREFIX + id, JSON.stringify(deepMerge(read(id), patch))); } catch (e) { throw e; }
       emit(id);
+    },
+    async replaceAll(entries) {
+      entries.forEach(([id, data]) => localStorage.setItem(PREFIX + id, JSON.stringify(data)));
+      entries.forEach(([id]) => emit(id));
     }
   };
 }
@@ -524,6 +534,129 @@ function setupNotes() {
   notesArea.addEventListener("blur", () => { if (!timers.notities) notesPending = false; });
 }
 
+/* ── Wei-indeling: foto van het whiteboard ────────────────────────────── */
+
+const WEIDE_MAX_CHARS = 900000; // moet passen in één Firestore-document (max. 1 MB), zie firestore.rules
+let weide = { huidig: {}, vorige: {} };
+
+// Verklein de foto tot een JPEG die in de database past, maar scherp genoeg is om de namen te lezen.
+async function compressPhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Deze foto kan niet gelezen worden"));
+      el.src = url;
+    });
+    for (const [maxSide, quality] of [[2000, 0.8], [1800, 0.75], [1600, 0.7], [1400, 0.65], [1200, 0.6], [1000, 0.55]]) {
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      const data = canvas.toDataURL("image/jpeg", quality);
+      if (data.startsWith("data:image/jpeg;base64,") && data.length <= WEIDE_MAX_CHARS) return data;
+    }
+    throw new Error("De foto is te groot");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function fmtPlaced(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "onbekende datum";
+  return d.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" }) +
+    " om " + d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+}
+const hasPhoto = w => !!(w && typeof w.foto === "string" && w.foto.startsWith("data:image/jpeg;base64,"));
+
+function renderWeide() {
+  const cur = weide.huidig, prev = weide.vorige;
+  document.getElementById("weiOpen").hidden = !hasPhoto(cur);
+  document.getElementById("weiEmpty").hidden = hasPhoto(cur);
+  const meta = document.getElementById("weiMeta");
+  meta.hidden = !hasPhoto(cur);
+  if (hasPhoto(cur)) {
+    const thumb = document.getElementById("weiThumb");
+    if (thumb.src !== cur.foto) thumb.src = cur.foto;
+    meta.textContent = `Geplaatst ${fmtPlaced(cur.geplaatst)}`;
+  }
+  document.getElementById("weiPrev").hidden = !hasPhoto(prev);
+  if (hasPhoto(prev)) document.getElementById("weiPrevDate").textContent = fmtPlaced(prev.geplaatst);
+}
+
+function openWeide(which) {
+  const w = weide[which];
+  if (!hasPhoto(w)) return;
+  const dialog = document.getElementById("weiDialog");
+  document.getElementById("weiFull").src = w.foto;
+  document.getElementById("weiDialogTitle").textContent =
+    `${which === "huidig" ? "Wei-indeling" : "Vorige wei-indeling"} · ${fmtPlaced(w.geplaatst)}`;
+  setZoom(false);
+  if (dialog.showModal) dialog.showModal(); else dialog.setAttribute("open", "");
+}
+
+function setZoom(on) {
+  document.getElementById("weiDialogBody").classList.toggle("zoomed", on);
+  document.getElementById("weiZoom").textContent = on ? "Passend" : "Inzoomen";
+}
+
+function setupWeide() {
+  store.watch("weide-huidig", data => { weide.huidig = data || {}; renderWeide(); });
+  store.watch("weide-vorige", data => { weide.vorige = data || {}; renderWeide(); });
+
+  const dialog = document.getElementById("weiDialog");
+  const body = document.getElementById("weiDialogBody");
+  document.getElementById("weiOpen").addEventListener("click", () => openWeide("huidig"));
+  document.getElementById("weiPrevOpen").addEventListener("click", () => openWeide("vorige"));
+  document.getElementById("weiClose").addEventListener("click", () => dialog.close ? dialog.close() : dialog.removeAttribute("open"));
+  document.getElementById("weiZoom").addEventListener("click", () => setZoom(!body.classList.contains("zoomed")));
+  document.getElementById("weiFull").addEventListener("click", () => setZoom(!body.classList.contains("zoomed")));
+
+  const input = document.getElementById("weiInput");
+  const label = document.getElementById("weiUploadLabel");
+  input.addEventListener("change", async () => {
+    const file = input.files && input.files[0];
+    input.value = "";
+    if (!file) return;
+    label.classList.add("busy");
+    setStatus("Foto verkleinen…");
+    try {
+      const foto = await compressPhoto(file);
+      const entries = [["weide-huidig", { foto, geplaatst: new Date().toISOString() }]];
+      // De huidige indeling schuift door naar "vorige", zodat je hem kunt terugzetten.
+      if (hasPhoto(weide.huidig)) entries.unshift(["weide-vorige", { foto: weide.huidig.foto, geplaatst: weide.huidig.geplaatst || "" }]);
+      await replaceWeide(entries, "Nieuwe wei-indeling geplaatst ✓");
+    } catch (e) {
+      console.error(e);
+      setStatus(`Foto plaatsen mislukt — ${e.message || "probeer het opnieuw"}`, true);
+    } finally {
+      label.classList.remove("busy");
+    }
+  });
+
+  document.getElementById("weiRestore").addEventListener("click", async () => {
+    if (!hasPhoto(weide.vorige)) return;
+    if (!confirm("De vorige wei-indeling terugzetten? De huidige foto wordt dan de ‘vorige’.")) return;
+    const entries = [["weide-huidig", { ...weide.vorige }]];
+    if (hasPhoto(weide.huidig)) entries.push(["weide-vorige", { foto: weide.huidig.foto, geplaatst: weide.huidig.geplaatst || "" }]);
+    await replaceWeide(entries, "Vorige wei-indeling teruggezet ✓");
+  });
+}
+
+async function replaceWeide(entries, okMsg) {
+  setStatus(navigator.onLine ? "Foto opslaan…" : "Offline — de foto wordt verstuurd zodra je weer verbinding hebt");
+  try {
+    await store.replaceAll(entries);
+    setStatus(okMsg);
+  } catch (e) {
+    console.error(e);
+    setStatus("Foto opslaan mislukt — controleer je internetverbinding en probeer opnieuw", true);
+  }
+}
+
 // Nieuwe week begonnen terwijl de pagina openstaat? Dan schuift alles automatisch door.
 function checkRollover() {
   if (fmtISO(getMonday(new Date())) !== renderedMonday) {
@@ -610,6 +743,7 @@ async function init() {
   setupBoard();
   buildWeeks();
   setupNotes();
+  setupWeide();
   subscribe();
   loadWeather();
   setStatus(store.shared ? "Live verbonden ✓ — wijzigingen zijn direct zichtbaar voor iedereen" : "Klaar (alleen op dit apparaat)");
