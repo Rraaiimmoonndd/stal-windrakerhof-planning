@@ -7,7 +7,7 @@ Weekschema voor het buiten en binnen zetten van de paarden, gedeeld via een link
 - **Vast**-vinkje: die naam komt vanaf die week elke week automatisch terug op die dag, tot iemand het uitvinkt. Eerdere weken veranderen niet mee.
 - Nieuwe week? Dan schuift het schema vanzelf door.
 - Gedeeld notitieveld, oranje markering voor lege plekken, weerbericht voor Puth (Open-Meteo).
-- **Wei-indeling**: foto van het whiteboard, groot te openen en in te zoomen. ‘Nieuwe foto’ vervangt hem; de vorige blijft bewaard (tot de volgende nieuwe foto) en kan worden teruggezet. De foto wordt op de telefoon verkleind en als JPEG in Firestore bewaard (`weide-huidig` / `weide-vorige`), dus geen Firebase Storage of betaald abonnement nodig.
+- **Wei-indeling**: knop rechtsboven klapt de foto van het whiteboard uit (tussen notities en planning), groot te openen en in te zoomen. ‘Nieuwe foto’ vervangt hem; de vorige blijft bewaard (tot de volgende nieuwe foto) en kan worden teruggezet. De foto wordt op de telefoon verkleind en als JPEG in Firestore bewaard (`weide-huidig` / `weide-vorige`), dus geen Firebase Storage of betaald abonnement nodig.
 - Alles wordt live gedeeld via Firebase Firestore; inloggen is niet nodig.
 
 ## Bestanden

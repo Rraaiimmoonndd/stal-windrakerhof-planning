@@ -583,6 +583,7 @@ function renderWeide() {
     if (thumb.src !== cur.foto) thumb.src = cur.foto;
     meta.textContent = `Geplaatst ${fmtPlaced(cur.geplaatst)}`;
   }
+  document.getElementById("weiUploadText").textContent = hasPhoto(cur) ? "📷 Nieuwe foto" : "📷 Foto toevoegen";
   document.getElementById("weiPrev").hidden = !hasPhoto(prev);
   if (hasPhoto(prev)) document.getElementById("weiPrevDate").textContent = fmtPlaced(prev.geplaatst);
 }
@@ -606,6 +607,18 @@ function setZoom(on) {
 function setupWeide() {
   store.watch("weide-huidig", data => { weide.huidig = data || {}; renderWeide(); });
   store.watch("weide-vorige", data => { weide.vorige = data || {}; renderWeide(); });
+
+  // Standaard ingeklapt: alleen de knop rechtsboven. Uitklappen toont het blok tussen notities en planning.
+  const block = document.getElementById("weiBlock");
+  const toggle = document.getElementById("weiToggle");
+  const setExpanded = open => {
+    block.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.classList.toggle("active", open);
+    if (open) block.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+  toggle.addEventListener("click", () => setExpanded(block.hidden));
+  document.getElementById("weiMinimize").addEventListener("click", () => { setExpanded(false); toggle.focus(); });
 
   const dialog = document.getElementById("weiDialog");
   const body = document.getElementById("weiDialogBody");

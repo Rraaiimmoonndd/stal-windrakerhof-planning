@@ -284,6 +284,23 @@ body {
 .install-dismiss:hover { background: rgba(0, 0, 0, 0.05); }
 
 /* ── Wei-indeling (foto van het whiteboard) ──────────────────────────── */
+.wei-toggle {
+  margin-left: auto; align-self: flex-start; flex-shrink: 0;
+  font: inherit; font-size: 12px; font-weight: bold; white-space: nowrap;
+  background: var(--accent); color: var(--blue-dark); border: 1px solid #c9dcf7;
+  border-radius: 8px; padding: 7px 10px; cursor: pointer;
+}
+.wei-toggle { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 440px) {
+  /* Smalle telefoon: kleiner logo en een compacte knop (icoon boven tekst), zodat de titel ruimte houdt. */
+  .brand { gap: 10px; }
+  .brand .logo { width: 64px; height: 64px; }
+  .wei-toggle { flex-direction: column; gap: 1px; font-size: 11px; padding: 5px 7px; line-height: 1.2; }
+  .wei-toggle-icon { font-size: 18px; }
+}
+@media (max-width: 350px) { .stable-name { font-size: 19px; } }
+.wei-toggle.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.wei-block[hidden] { display: none; }
 .wei-block {
   background: var(--card);
   border: 1px solid var(--border);
@@ -291,8 +308,12 @@ body {
   padding: 12px;
   margin-bottom: 18px;
 }
-.wei-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.wei-title { font-size: 16px; margin: 0; color: var(--blue-dark); }
+.wei-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.wei-title { font-size: 16px; margin: 0 auto 0 0; color: var(--blue-dark); }
+.wei-minimize {
+  font: inherit; font-size: 14px; background: var(--bg); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; cursor: pointer; flex-shrink: 0;
+}
 .wei-upload {
   font-size: 13px; font-weight: bold; background: var(--blue); color: #fff;
   border-radius: 8px; padding: 8px 12px; cursor: pointer; white-space: nowrap;
